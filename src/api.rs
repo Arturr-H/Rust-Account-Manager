@@ -125,27 +125,58 @@ pub(super) fn create_account(
     respond(&mut stream, 200u16, None, None);
 }
 
-pub(super) fn all_docs(
+/*- Login accounts -*/
+pub(super) fn login(
     mut stream : TcpStream,
         request: String,
         params : HashMap<String, String>
 ) -> () {
 
-    /*- Establish a connection -*/
-    let collection:Collection<Document> = utils::establish_mclient();
+    /*- Require some headers to be specified -*/
+    let required = utils::get_required_headers("login");
+    let headers  = parse_headers(request, HeaderReturn::All);
+    if !expect_headers(&mut stream, &headers, required) { return; };
 
-    /*- Get all documents -*/
-    let docs = collection.find(None, None)
-        .expect("Failed to get all documents.");
+    /*- Initialize the user -*/
+    let password:String;
+    let email:String;
 
-    /*- Convert the documents to a string -*/
-    let mut docs_str = String::new();
+    /*- Get the headers -*/
+    if let HeaderReturn::Values(headers) = headers {
+        /*- Get the values -*/
+        password = headers.get("password").unwrap().to_string();
+        email    = headers.get("email").unwrap().to_string();
+    }
+    /*- If parsing headers was unsuccessful -*/
+    else { return respond(&mut stream, 404, None, None); };
 
-    /*- Iterate over the documents -*/
-    for doc in docs {
-        docs_str += &format!("{:?}", doc);
+    /*- Establish the mongodb connection -*/
+    let collection:Collection<User> = utils::establish_mclient::<User>();
+
+    /*- Check if email exists -*/
+    let email_exists = collection.find(doc!{"email": email.to_string()}, None).unwrap().next().is_some();
+    if !email_exists {
+        return respond(
+            &mut stream,
+            404,
+            Some(ResponseType::Text),
+            Some(DICTIONARY.error.login)
+        );
     };
 
-    /*- Respond with the string -*/
-    respond(&mut stream, 200u16, Some(ResponseType::Text), Some(&docs_str));
+    /*- Get the user -*/
+    let user = collection.find(doc!{"email": email.to_string()}, None).unwrap().next().unwrap().unwrap();
+
+    /*- Check if password is correct -*/
+    if &user.password != &utils::hash(&password) {
+        return respond(
+            &mut stream,
+            401,
+            Some(ResponseType::Text),
+            Some(DICTIONARY.error.login)
+        );
+    };
+
+    /*- Respond with a success message -*/
+    respond(&mut stream, 200u16, None, None);
 }

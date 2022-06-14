@@ -26,6 +26,7 @@ pub struct Error<'lf> {
     pub in_use: InUse<'lf>,
     pub password: Password<'lf>,
     pub invalid: Invalid<'lf>,
+    pub login:&'lf str,
 }
 
 /*- (ERR) When something with the password has gone wrong -*/
@@ -60,6 +61,7 @@ pub(crate) const DICTIONARY:Dictionary = Dictionary {
         invalid: Invalid {
             email: "Email is invalid",
             username: "Username is invalid"
-        }
+        },
+        login: "Email or password is incorrect."
     }
 };
