@@ -1,0 +1,31 @@
+[package]
+name = "rust-account-manager"
+version = "0.1.0"
+edition = "2021"
+description = "Rust Account Manager - A backend-rust-library for managing accounts."
+license = "MIT"
+
+# Regular dependencies
+[dependencies]
+fastserve = "0.1.9"
+sha3 = "0.10.1"
+hex-literal = "0.3.4"
+rand = "0.8.5"
+serde = "1.0.137"
+lazy_static = "1.4.0"
+regex = "1.5.6"
+
+# UUID-generator
+[dependencies.uuid]
+version = "1.1.2"
+features = [
+    "v4",                # Lets you generate random UUIDs
+    "fast-rng",          # Use a faster (but still sufficiently random) RNG
+    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+]
+
+# Mongo Database
+[dependencies.mongodb]
+mongodb = "2.1.0"
+default-features = false
+features = ["sync"]
