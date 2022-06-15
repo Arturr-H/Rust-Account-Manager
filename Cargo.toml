@@ -11,9 +11,10 @@ fastserve = "0.1.9"
 sha3 = "0.10.1"
 hex-literal = "0.3.4"
 rand = "0.8.5"
-serde = "1.0.137"
+serde = { version = "1.0.137", features = ["derive"] }
 lazy_static = "1.4.0"
 regex = "1.5.6"
+jsonwebtoken = "8.1.0"
 
 # UUID-generator
 [dependencies.uuid]

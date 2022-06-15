@@ -8,10 +8,17 @@
 
 /*- Imports -*/
 use crate::utils;
+use crate::dict::DICTIONARY;
+use serde::{ Serialize, Deserialize };
+use jsonwebtoken::{ encode, decode, Header, Algorithm, Validation, EncodingKey, DecodingKey };
 use crate::user::{
     User,
+    UserClaims,
+    AuthorizationStatus,
+    get_expiration_time,
     generate_uuid,
-    check_email
+    authenticate,
+    check_email,
 };
 use std::{
     ops,
@@ -20,14 +27,14 @@ use std::{
     hash::Hash,
     borrow::Borrow
 };
-use crate::dict::DICTIONARY;
 use fastserve::{
     respond,
     ResponseType,
     {
         expect_headers,
+        parse_headers,
         HeaderReturn
-    }, parse_headers,
+    },
 };
 use mongodb::{
     bson::{
@@ -49,7 +56,9 @@ pub(crate) const MONGO_CLIENT_URI_STRING:  &'static str = "mongodb://localhost:2
     Accessing these is done via a function
     that lies somewhere in utils.rs -*/
 pub(crate) const REQUIRED_HEADERS: &'static [(&'static str, &[&'static str])] = &[
-    ("create_account", &["username", "display_name", "password", "email", "bio", "age"]),
+    ("create_account",  &["username", "display_name", "password", "email", "bio", "age"]),
+    ("login",           &["email", "password"]),
+    ("auth_test",       &["token"]),
 ];
 
 /*- Functions -*/
@@ -177,6 +186,65 @@ pub(super) fn login(
         );
     };
 
+    /*- Create the user claims -*/
+    let user_claims = UserClaims {
+        uid: user.uid.clone(),
+        username: user.username.clone(),
+        exp: get_expiration_time(),
+    };
+
+    /*- Create the token -*/
+    let token = User::create__JWT__token(user);
+
     /*- Respond with a success message -*/
-    respond(&mut stream, 200u16, None, None);
+    respond(
+        &mut stream,
+        200u16,
+        Some(ResponseType::Json),
+
+        /*- Format some JSON -*/
+        Some(
+            &format!(
+                "{}\"token\":\"{}\"{}",
+                "{", &token, "}"
+            )
+        )
+    );
+}
+
+/*- Authenticate using just a token as header -*/
+pub(super) fn auth_test(
+    mut stream : TcpStream,
+        request: String,
+        params : HashMap<String, String>
+) -> () {
+
+    /*- Require some headers to be specified -*/
+    let required = utils::get_required_headers("auth_test");
+    let headers  = parse_headers(request, HeaderReturn::All);
+    if !expect_headers(&mut stream, &headers, required) { return; };
+
+    /*- Check the auth availability -*/
+    let     authentication_status:AuthorizationStatus = authenticate(headers);
+    match   authentication_status {
+        AuthorizationStatus::Authorized => 
+            (),
+        AuthorizationStatus::Unauthorized => 
+            return respond(
+                &mut stream,
+                401u16,
+                Some(ResponseType::Text),
+                Some(DICTIONARY.error.unauthorized)
+            ),
+        AuthorizationStatus::Err =>
+            return respond(
+                &mut stream,
+                401u16,
+                Some(ResponseType::Text),
+                Some(DICTIONARY.error.unauthorized)
+            )
+    }
+
+    /*- Respond -*/
+    return respond(&mut stream, 202, None, None);
 }

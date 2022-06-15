@@ -15,7 +15,6 @@ use fastserve::{ *, RouteRoot as RR, RouteValue as RV };
 use std::ops;
 
 /*- Statics & Constants -*/
-const _A:u8 = 0;
 
 /*- Structs, enums, unions -*/
 
@@ -25,7 +24,8 @@ fn main() -> () {
     let routes:Vec<RR> = vec![
         RR::Stack("/", vec![
             RR::Endpoint("login",           RV::Function(api::login         )),
-            RR::Endpoint("create-account",  RV::Function(api::create_account)) 
+            RR::Endpoint("create-account",  RV::Function(api::create_account)),
+            RR::Endpoint("authenticate",    RV::Function(api::auth_test     )) 
         ]),
     ];
 

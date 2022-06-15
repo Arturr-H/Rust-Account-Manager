@@ -14,7 +14,6 @@ lazy_static! {
     };
 }
 
-
 /*- A dictionary of phrases that are ex
     responded with inside of this project -*/
 pub struct Dictionary<'lf> {
@@ -27,6 +26,7 @@ pub struct Error<'lf> {
     pub password: Password<'lf>,
     pub invalid: Invalid<'lf>,
     pub login:&'lf str,
+    pub unauthorized:&'lf str,
 }
 
 /*- (ERR) When something with the password has gone wrong -*/
@@ -62,6 +62,7 @@ pub(crate) const DICTIONARY:Dictionary = Dictionary {
             email: "Email is invalid",
             username: "Username is invalid"
         },
-        login: "Email or password is incorrect."
+        login: "Email or password is incorrect.",
+        unauthorized: "Unauthorized."
     }
 };
