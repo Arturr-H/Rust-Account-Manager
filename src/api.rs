@@ -9,8 +9,11 @@
 /*- Imports -*/
 use crate::{utils, safe_user::SafeUser};
 use crate::dict::DICTIONARY;
+use fastserve::ResponseTypeImage;
 use serde::{ Serialize, Deserialize };
+use chunked_transfer::Encoder;
 use serde_json;
+use image;
 use jsonwebtoken::{ encode, decode, Header, Algorithm, Validation, EncodingKey, DecodingKey };
 use crate::user::{
     User,
@@ -22,13 +25,15 @@ use crate::user::{
     authenticate,
     check_email,
 };
+use std::io::{Read, Write};
 use std::{
     ops,
     net::TcpStream,
     collections::HashMap,
     hash::Hash,
     borrow::Borrow,
-    default
+    default,
+    path::Path,
 };
 use fastserve::{
     respond,
@@ -101,8 +106,11 @@ pub(super) fn create_account(
         return respond(
             &mut stream,
             400,
-            Some(ResponseType::Text),
-            Some(DICTIONARY.error.invalid.email)
+            Some((
+                ResponseType::Text,
+                DICTIONARY.error.invalid.email
+            )),
+            None
         );
     };
 
@@ -115,8 +123,11 @@ pub(super) fn create_account(
         return respond(
             &mut stream,
             409,
-            Some(ResponseType::Text),
-            Some(DICTIONARY.error.in_use.username)
+            Some((
+                ResponseType::Text,
+                DICTIONARY.error.in_use.username
+            )),
+            None
         );
     };
     
@@ -126,8 +137,11 @@ pub(super) fn create_account(
         return respond(
             &mut stream,
             409,
-            Some(ResponseType::Text),
-            Some(DICTIONARY.error.in_use.email)
+            Some((
+                ResponseType::Text,
+                DICTIONARY.error.in_use.email
+            )),
+            None
         );
     };
     
@@ -172,8 +186,11 @@ pub(super) fn login(
         return respond(
             &mut stream,
             404,
-            Some(ResponseType::Text),
-            Some(DICTIONARY.error.login)
+            Some((
+                ResponseType::Text,
+                DICTIONARY.error.login
+            )),
+            None
         );
     };
 
@@ -185,8 +202,11 @@ pub(super) fn login(
         return respond(
             &mut stream,
             401,
-            Some(ResponseType::Text),
-            Some(DICTIONARY.error.login)
+            Some((
+                ResponseType::Text,
+                DICTIONARY.error.login
+            )),
+            None
         );
     };
 
@@ -197,15 +217,16 @@ pub(super) fn login(
     respond(
         &mut stream,
         200u16,
-        Some(ResponseType::Json),
-
-        /*- Format some JSON -*/
-        Some(
+        Some((
+            ResponseType::Json,
+    
+            /*- Format some JSON -*/
             &format!(
                 "{}\"token\":\"{}\"{}",
                 "{", &token, "}"
             )
-        )
+        )),
+        None
     );
 }
 
@@ -230,15 +251,21 @@ pub(super) fn auth_test(
             return respond(
                 &mut stream,
                 401u16,
-                Some(ResponseType::Text),
-                Some(DICTIONARY.error.unauthorized)
+                Some((
+                    ResponseType::Text,
+                    DICTIONARY.error.unauthorized
+                )),
+                None
             ),
         AuthorizationStatus::Err =>
             return respond(
                 &mut stream,
                 401u16,
-                Some(ResponseType::Text),
-                Some(DICTIONARY.error.unauthorized)
+                Some((
+                    ResponseType::Text,
+                    DICTIONARY.error.unauthorized
+                )),
+                None
             )
     }
 
@@ -290,9 +317,69 @@ pub(crate) fn profile_data(
     respond(
         &mut stream,
         200u16,
-        Some(ResponseType::Json),
-        Some(&serde_json::to_string(
-            &user_data
-        ).unwrap())
+        Some((
+            ResponseType::Json,
+            &serde_json::to_string(
+                &user_data
+            ).unwrap()
+        )),
+        None
     );
 }
+
+/*- Respond with a png image -*/
+pub(crate) fn profile_image(
+    mut stream : TcpStream,
+        request: String,
+        params : HashMap<String, String>
+) -> () {
+    
+    /*- Get the param named 'profile_image' -*/
+    let profile_image:&str = &params
+        .get("profile_image")
+        .unwrap_or(
+            &"".to_string()
+        ).to_string();
+
+    /*- Search for the image in the static/ dir -*/
+    let image_path:String  = format!("uploads/{}.jpg", profile_image);
+    let pfp_not_found:&str = &"static/images/default-user.jpg";
+
+    /*- Buffers -*/
+    let mut buf = Vec::new();
+    let file = std::fs::File::open(image_path);
+
+    /*- Error handling -*/
+    let mut file = match file {
+        Ok(file) => file,
+        Err(_) => match std::fs::File::open(pfp_not_found) {
+            Ok(file) => file,
+            Err(_) => return respond(&mut stream, 404u16, None, None)
+        }
+    };
+    
+    file.read_to_end(&mut buf).unwrap_or_default();
+    
+    /*- Encode -*/
+    let mut encoded = Vec::new();
+    {
+        let mut encoder = Encoder::with_chunks_size(&mut encoded, 64);
+        encoder.write_all(&buf).unwrap_or_default();
+    }
+
+    /*- Create the response -*/
+    let headers = [
+        "HTTP/1.1 200 OK",
+        "Content-type: image/png",
+        "Transfer-Encoding: chunked",
+        "\r\n"
+    ];
+    let mut response = headers.join("\r\n")
+        .to_string()
+        .into_bytes();
+        response.extend(encoded);
+
+    /*- Respond with the image -*/
+    stream.write(&response).unwrap_or_default();
+}
+        

@@ -26,7 +26,8 @@ fn main() -> () {
             RR::Endpoint("login",               RV::Function(api::login         )),
             RR::Endpoint("create-account",      RV::Function(api::create_account)),
             RR::Endpoint("authenticate",        RV::Function(api::auth_test     )),
-            RR::Endpoint("profile_data/:suid",  RV::Function(api::profile_data  )) 
+            RR::Endpoint("profile_data/:suid",  RV::Function(api::profile_data  )),
+            RR::Endpoint("profile_image/:profile_image",  RV::Function(api::profile_image  )) 
         ]),
     ];
 
