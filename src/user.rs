@@ -9,6 +9,8 @@ use std::{ time, thread, fmt, collections::HashMap };
 use serde::{ Serialize, Deserialize, de::DeserializeOwned };
 use jsonwebtoken::{ encode, decode, Header, Algorithm, Validation, EncodingKey, DecodingKey, TokenData };
 
+use crate::safe_user::SafeUser;
+
 /*- Constants -*/
 const SECRET_KEY:&str = "Secret123";
 
@@ -20,6 +22,7 @@ pub(crate) struct User {
     pub email       : String, 
     pub bio         : String,
     pub uid         : String,
+    pub suid        : String,
     pub age         : u8,
 }
 
@@ -41,6 +44,7 @@ impl Default for User {
             email       : String::new(),
             bio         : String::new(),
             uid         : String::new(),
+            suid        : String::new(),
             age         : 0,
         }
     }
@@ -119,11 +123,26 @@ impl User {
             Err(_) => Err(())
         };
     }
+
+    /*- Convert to SafeUser -*/
+    pub fn to_safe(user:User) -> SafeUser {
+        return SafeUser {
+            username    : user.username,
+            display_name: user.display_name,
+            bio         : user.bio,
+            age         : user.age,
+        }
+    }
 }
 
 /*- Utility functions -*/
 pub fn generate_uuid() -> String {
     Uuid::new_v4().as_hyphenated().to_string()
+}
+
+/*- Secure user identification -*/
+pub fn generate_suid() -> String {
+    Uuid::new_v4().as_simple().to_string()
 }
 
 /*- If email is valid -*/

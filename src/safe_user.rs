@@ -1,5 +1,6 @@
 /*- Imports -*/
 use std::fmt;
+use serde::{ Serialize, Deserialize };
 use crate::user::User;
 
 /// # SafeUser
@@ -8,6 +9,7 @@ use crate::user::User;
 /// Like the password, the uid, and the email.
 /// SafeUser is used in a variety of places, like when displaying a user's profile to clients.
 /// There are functions to convert any user into a SafeUser, like convert_user().
+#[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct SafeUser {
     pub username    : String,
     pub display_name: String,

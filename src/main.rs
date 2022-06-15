@@ -23,9 +23,10 @@ fn main() -> () {
     /*- The api routes -*/
     let routes:Vec<RR> = vec![
         RR::Stack("/", vec![
-            RR::Endpoint("login",           RV::Function(api::login         )),
-            RR::Endpoint("create-account",  RV::Function(api::create_account)),
-            RR::Endpoint("authenticate",    RV::Function(api::auth_test     )) 
+            RR::Endpoint("login",               RV::Function(api::login         )),
+            RR::Endpoint("create-account",      RV::Function(api::create_account)),
+            RR::Endpoint("authenticate",        RV::Function(api::auth_test     )),
+            RR::Endpoint("profile_data/:suid",  RV::Function(api::profile_data  )) 
         ]),
     ];
 

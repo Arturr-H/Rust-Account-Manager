@@ -7,9 +7,10 @@
 )]
 
 /*- Imports -*/
-use crate::utils;
+use crate::{utils, safe_user::SafeUser};
 use crate::dict::DICTIONARY;
 use serde::{ Serialize, Deserialize };
+use serde_json;
 use jsonwebtoken::{ encode, decode, Header, Algorithm, Validation, EncodingKey, DecodingKey };
 use crate::user::{
     User,
@@ -17,6 +18,7 @@ use crate::user::{
     AuthorizationStatus,
     get_expiration_time,
     generate_uuid,
+    generate_suid,
     authenticate,
     check_email,
 };
@@ -25,7 +27,8 @@ use std::{
     net::TcpStream,
     collections::HashMap,
     hash::Hash,
-    borrow::Borrow
+    borrow::Borrow,
+    default
 };
 use fastserve::{
     respond,
@@ -44,7 +47,7 @@ use mongodb::{
     sync::{
         Client,
         Collection,
-        Database
+        Database, Cursor
     },
 };
 
@@ -87,6 +90,7 @@ pub(super) fn create_account(
             bio         : headers.get("bio").unwrap().to_string(),
             age         : headers.get("age").unwrap().parse::<u8>().unwrap(),
             uid         : generate_uuid(),
+            suid        : generate_suid(),
         };
     }
     /*- If parsing headers was unsuccessful -*/
@@ -240,4 +244,55 @@ pub(super) fn auth_test(
 
     /*- Respond -*/
     return respond(&mut stream, 202, None, None);
+}
+
+/*- Get other user's profile -*/
+pub(crate) fn profile_data(
+    mut stream : TcpStream,
+        request: String,
+        params : HashMap<String, String>
+) -> () {
+    
+    /*- No headers required, the requested users'
+        suid is specified in the URL-params -*/
+    let request_suid:&str = &params
+        .get("suid")
+        .unwrap_or(
+            &"".to_string()
+        ).to_string();
+
+    /*- Establish the mongodb connection -*/
+    let collection:Collection<User> = utils::establish_mclient::<User>();
+
+    /*- Check if the user exists -*/
+    let user_exists = collection.find(
+        doc!{
+            "suid": request_suid.to_string()
+        }, None
+    );
+
+    /*- Get the userdata or respond 404 if not available,
+        and convert the user to a SafeUser for safety  -*/
+    let user_data:SafeUser = User::to_safe(match user_exists {
+        Ok(mut async_cursor) => {
+            match async_cursor.next() {
+                Some(user_data) => match user_data {
+                    Ok(user_data) => user_data,
+                    Err(_) => return respond(&mut stream, 404, None, None)
+                },
+                None => return respond(&mut stream, 404, None, None)
+            }
+        },
+        Err(_) => return respond(&mut stream, 404, None, None)
+    });
+
+    /*- Respond with the userdata -*/
+    respond(
+        &mut stream,
+        200u16,
+        Some(ResponseType::Json),
+        Some(&serde_json::to_string(
+            &user_data
+        ).unwrap())
+    );
 }
