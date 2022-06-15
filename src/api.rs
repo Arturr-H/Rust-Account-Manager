@@ -186,13 +186,6 @@ pub(super) fn login(
         );
     };
 
-    /*- Create the user claims -*/
-    let user_claims = UserClaims {
-        uid: user.uid.clone(),
-        username: user.username.clone(),
-        exp: get_expiration_time(),
-    };
-
     /*- Create the token -*/
     let token = User::create__JWT__token(user);
 
