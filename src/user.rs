@@ -20,7 +20,6 @@ pub(crate) struct User {
     pub display_name: String,
     pub password    : String,
     pub email       : String, 
-    pub bio         : String,
     pub uid         : String,
     pub suid        : String,
     pub age         : u8,
@@ -42,7 +41,6 @@ impl Default for User {
             display_name: String::new(),
             password    : String::new(),
             email       : String::new(),
-            bio         : String::new(),
             uid         : String::new(),
             suid        : String::new(),
             age         : 0,
@@ -55,8 +53,8 @@ impl fmt::Debug for User {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "User {{ username: {}, display_name: {}, password: {}, email: {}, bio: {}, uid: {}, age: {} }}",
-            self.username, self.display_name, self.password, self.email, self.bio, self.uid, self.age
+            "User {{ username: {}, display_name: {}, password: {}, email: {}, uid: {}, age: {} }}",
+            self.username, self.display_name, self.password, self.email, self.uid, self.age
         )
     }
 }
@@ -129,7 +127,6 @@ impl User {
         return SafeUser {
             username    : user.username,
             display_name: user.display_name,
-            bio         : user.bio,
             age         : user.age,
         }
     }
@@ -178,15 +175,18 @@ pub(crate) fn authenticate(headers:HeaderReturn) -> AuthorizationStatus {
     /*- Get the headers -*/
     if let HeaderReturn::Values(headers) = headers {
         /*- Get the values -*/
-        token = headers.get("token").unwrap().to_string();
+        token = match headers.get("authorization") {
+            Some(token) => token,
+            None        => { println!("shti"); return AuthorizationStatus::Err; }
+        }.to_string().replace("Bearer ", "");
     }
     /*- If parsing headers was unsuccessful -*/
-    else { return AuthorizationStatus::Err; };
+    else { println!("shtia");return AuthorizationStatus::Err; };
 
     /*- Decode the token -*/
     let user_claims = User::decode__JWT__token(&token);
 
-    /*- Return¨-*/
+    /*- Return -*/
     if user_claims.is_err() { return AuthorizationStatus::Unauthorized; }
     else                    { return AuthorizationStatus::Authorized;   };
 }
