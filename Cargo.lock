@@ -569,9 +569,9 @@ dependencies = [
 
 [[package]]
 name = "fastserve"
-version = "0.2.0"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "152b5f4ddf655377d75381266edbd3498700dd7737e23d018dae5605c71d1834"
+checksum = "4a355badafc32a0ea02fae46370711740689346dbc1c8959449df04639bc672c"
 dependencies = [
  "lazy_static 0.1.16",
  "num",

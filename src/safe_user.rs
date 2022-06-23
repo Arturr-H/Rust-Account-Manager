@@ -12,8 +12,8 @@ use crate::user::User;
 #[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct SafeUser {
     pub username    : String,
-    pub display_name: String,
-    pub bio         : String,
+    pub displayname : String,
+    pub suid        : String,
     pub age         : u8,
 }
 
@@ -22,8 +22,8 @@ impl fmt::Debug for SafeUser {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "User {{ username: {}, display_name: {}, bio: {}, age: {} }}",
-            self.username, self.display_name, self.bio, self.age
+            "User {{ username: {}, displayname: {}, age: {}, suid: {} }}",
+            self.username, self.displayname, self.age, self.suid
         )
     }
 }
@@ -32,8 +32,8 @@ impl fmt::Debug for SafeUser {
 pub(crate) fn convert_user(user: User) -> SafeUser {
     SafeUser {
         username    : user.username,
-        display_name: user.display_name,
-        bio         : user.bio,
+        displayname : user.displayname,
+        suid        : user.suid,
         age         : user.age,
     }
 }

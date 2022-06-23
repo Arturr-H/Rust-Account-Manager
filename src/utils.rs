@@ -25,9 +25,13 @@ use mongodb::{
         Database
     },
 };
+use std::time::{
+    SystemTime,
+    UNIX_EPOCH
+};
 
 /*- Quick way of establishing a connection with the mongo client -*/
-pub(super) fn establish_mclient<Type__>() -> Collection<Type__> {
+pub(super) fn establish_mclient<Type__>(collection_name:&str) -> Collection<Type__> {
     /*- Establish the mongodb connection -*/
     let client:Client = Client::with_uri_str(
         MONGO_CLIENT_URI_STRING
@@ -37,7 +41,7 @@ pub(super) fn establish_mclient<Type__>() -> Collection<Type__> {
     let db:Database = client.database("test");
 
     /*- Get the collection -*/
-    let collection:Collection<Type__> = db.collection::<Type__>("test");
+    let collection:Collection<Type__> = db.collection::<Type__>(collection_name);
 
     /*- Return the collection -*/
     collection
@@ -70,3 +74,11 @@ pub(super) fn hash(value:&str) -> String {
     return format!("{:x}", hasher.finalize());
 }
 
+/*- Get unix epoch time -*/
+pub(super) fn get_unix_epoch_time() -> u64 {
+    /*- Get the current time -*/
+    let current_time = SystemTime::now();
+
+    /*- Convert to unix epoch time -*/
+    return current_time.duration_since(UNIX_EPOCH).unwrap().as_secs();
+}
