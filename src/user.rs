@@ -17,7 +17,7 @@ const SECRET_KEY:&str = "Secret123";
 #[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct User {
     pub username    : String,
-    pub display_name: String,
+    pub displayname : String,
     pub password    : String,
     pub email       : String, 
     pub uid         : String,
@@ -30,6 +30,7 @@ pub(crate) struct User {
 pub(crate) struct UserClaims {
     pub username: String,
     pub uid     : String,
+    pub suid    : String,
     pub exp     : usize,
 }
 
@@ -38,7 +39,7 @@ impl Default for User {
     fn default() -> Self {
         User {
             username    : String::new(),
-            display_name: String::new(),
+            displayname : String::new(),
             password    : String::new(),
             email       : String::new(),
             uid         : String::new(),
@@ -53,36 +54,13 @@ impl fmt::Debug for User {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "User {{ username: {}, display_name: {}, password: {}, email: {}, uid: {}, age: {} }}",
-            self.username, self.display_name, self.password, self.email, self.uid, self.age
+            "User {{ username: {}, displayname : {}, password: {}, email: {}, uid: {}, age: {} }}",
+            self.username, self.displayname , self.password, self.email, self.uid, self.age
         )
     }
 }
 
 impl User {
-    
-    /*- Authenticate users -*/
-    pub fn authenticate<Claims__>(
-        token:&str,
-        user:User
-    ) -> bool
-        where Claims__:
-            DeserializeOwned
-            + fmt::Debug
-    {
-        /*- Get the claims -*/
-        let user_claims = UserClaims {
-            username: user.username.clone(),
-            uid     : user.uid.clone(),
-            exp     : get_expiration_time(),
-        };
-
-        /*- Encode the claims -*/
-        let token = decode::<Claims__>(&token, &DecodingKey::from_secret(SECRET_KEY.as_ref()), &Validation::default())
-            .expect("Failed to decode token");
-        println!("{:?}", token);
-        true
-    }
 
     /*- Create a JWT token -*/
     pub fn create__JWT__token(user:User) -> String {
@@ -90,6 +68,7 @@ impl User {
         let user_claims = UserClaims {
             username: user.username.clone(),
             uid     : user.uid.clone(),
+            suid    : user.suid.clone(),
             exp     : get_expiration_time(),
         };
 
@@ -126,7 +105,8 @@ impl User {
     pub fn to_safe(user:User) -> SafeUser {
         return SafeUser {
             username    : user.username,
-            display_name: user.display_name,
+            displayname : user.displayname,
+            suid        : user.suid,
             age         : user.age,
         }
     }
@@ -177,22 +157,30 @@ pub(crate) fn authenticate(headers:HeaderReturn) -> AuthorizationStatus {
         /*- Get the values -*/
         token = match headers.get("authorization") {
             Some(token) => token,
-            None        => { println!("shti"); return AuthorizationStatus::Err; }
+            None        => {
+                match headers.get("Authorization") {
+                    Some(token) => token,
+                    None        => { return AuthorizationStatus::Err; }
+                }
+            }
         }.to_string().replace("Bearer ", "");
     }
     /*- If parsing headers was unsuccessful -*/
-    else { println!("shtia");return AuthorizationStatus::Err; };
+    else { return AuthorizationStatus::Err; };
 
     /*- Decode the token -*/
     let user_claims = User::decode__JWT__token(&token);
 
     /*- Return -*/
-    if user_claims.is_err() { return AuthorizationStatus::Unauthorized; }
-    else                    { return AuthorizationStatus::Authorized;   };
+    match user_claims {
+        Ok(u)   => return AuthorizationStatus::Authorized(u),
+        Err(_)  => return AuthorizationStatus::Unauthorized
+    }
 }
 
+#[derive(Debug)]
 pub(crate) enum AuthorizationStatus{
-    Authorized,
+    Authorized(UserClaims),
     Unauthorized,
     Err,
 }

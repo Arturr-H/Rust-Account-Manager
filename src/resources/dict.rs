@@ -1,17 +1,24 @@
 /*- Imports -*/
 use lazy_static::lazy_static;
+use std::{collections::HashMap, hash::Hash};
 
-/*- Constants -*/
-pub(crate) struct Variables {
-    password_min_len:u8,
-    password_max_len:u8,
+/*- Static references -*/
+lazy_static! {
+    pub(crate) static ref ERROR_TREE:HashMap<u8, &'static str> = HashMap::from([
+        (102u8, "Internal error"),
+        
+        // Could be that docker deamon isn't running
+        // or that the mongo URI-string has changed.
+        (103u8, "Docker -> mongo bridge failed."),
+    ]);
 }
 
-lazy_static! {
-    static ref VARIABLES:Variables = Variables {
-        password_min_len: 8u8,
-        password_max_len: 100u8,
-    };
+/*- Quick way of getting error codes -*/
+pub(crate) fn get_error_code(code:u8) -> String {
+    format!("{} - {}",
+        code,
+        ERROR_TREE.get(&code).unwrap_or(&"")
+    )
 }
 
 /*- A dictionary of phrases that are ex

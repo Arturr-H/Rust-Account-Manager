@@ -1,4 +1,4 @@
-version: "1.0.0"
+version: '3.8'
 
 services:
   mongo: 
@@ -18,5 +18,13 @@ services:
       - mongodata:/data/db
     restart: always
 
+  rust:
+    build:
+      context: .
+      dockerfile: Main.Dockerfile
+
+    container_name: rust
+    ports:
+      - "8080:8080"
 volumes:
   mongodata:

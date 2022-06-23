@@ -7,7 +7,7 @@ license = "MIT"
 
 # Regular dependencies
 [dependencies]
-fastserve = "0.2.0"
+fastserve = "0.2.2"
 sha3 = "0.10.1"
 hex-literal = "0.3.4"
 rand = "0.8.5"
