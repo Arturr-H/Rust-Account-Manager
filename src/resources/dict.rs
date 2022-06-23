@@ -15,7 +15,7 @@ lazy_static! {
 
 /*- Quick way of getting error codes -*/
 pub(crate) fn get_error_code(code:u8) -> String {
-    format!("{} - {}",
+    format!("Errno.{} - {}",
         code,
         ERROR_TREE.get(&code).unwrap_or(&"")
     )

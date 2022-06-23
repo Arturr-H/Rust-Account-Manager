@@ -18,20 +18,24 @@ use std::ops;
 /*- Statics & Constants -*/
 
 /*- Structs, enums, unions -*/
+const POST:Method = Method::Post;
+const GET:Method =  Method::Get;
 
 /*- Startup -*/
 fn main() -> () {
     /*- The api routes -*/
     let routes:Vec<RR> = vec![
         RR::Stack("/", vec![
-            RR::Endpoint("feed",                            RV::Function((Method::Get, api::feed          ))),
-            RR::Endpoint("like",                            RV::Function((Method::Get, api::like          ))),
-            RR::Endpoint("tweet",                           RV::Function((Method::Get, api::tweet         ))),
-            RR::Endpoint("login",                           RV::Function((Method::Get, api::login         ))),
-            RR::Endpoint("hashtag",                         RV::Function((Method::Get, api::hashtag       ))),
-            RR::Endpoint("create-account",                  RV::Function((Method::Get, api::create_account))),
-            RR::Endpoint("profile_data/:suid",              RV::Function((Method::Get, api::profile_data  ))),
-            RR::Endpoint("profile_image/:profile_image",    RV::Function((Method::Get, api::profile_image ))) 
+            RR::Endpoint("feed",                            RV::Function((GET,  api::feed          ))),
+            RR::Endpoint("like",                            RV::Function((GET,  api::like          ))),
+            RR::Endpoint("login",                           RV::Function((GET,  api::login         ))),
+            RR::Endpoint("tweet",                           RV::Function((POST, api::tweet         ))),
+            RR::Endpoint("comment",                         RV::Function((POST, api::comment       ))),
+            RR::Endpoint("hashtag",                         RV::Function((GET,  api::hashtag       ))),
+            RR::Endpoint("get_comments",                    RV::Function((GET,  api::get_comments  ))),
+            RR::Endpoint("create-account",                  RV::Function((GET,  api::create_account))),
+            RR::Endpoint("profile_data/:suid",              RV::Function((GET,  api::profile_data  ))),
+            RR::Endpoint("profile_image/:profile_image",    RV::Function((GET,  api::profile_image ))) 
         ]),
     ];
 

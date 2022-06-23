@@ -7,7 +7,7 @@
 )]
 
 /*- Imports -*/
-use crate::{ utils, safe_user::SafeUser, tweet::Tweet };
+use crate::{ utils, safe_user::SafeUser, tweet::{Tweet, Comment} };
 use crate::dict::{ DICTIONARY, get_error_code };
 use fastserve::ResponseTypeImage;
 
@@ -63,7 +63,7 @@ use mongodb::{
 
 /*- Statics & Constants -*/
 pub(crate) const MONGO_DATABASE_NAME:      &'static str = "fastserve_accounts";
-pub(crate) const MONGO_CLIENT_URI_STRING:  &'static str = "mongodb://mongo:27017";
+pub(crate) const MONGO_CLIENT_URI_STRING:  &'static str = "mongodb://localhost:27017"; //mongodb://mongo:27017 if docker
 
 /*- All the functions' required headers.
     Accessing these is done via a function
@@ -71,9 +71,11 @@ pub(crate) const MONGO_CLIENT_URI_STRING:  &'static str = "mongodb://mongo:27017
 pub(crate) const REQUIRED_HEADERS: &'static [(&'static str, &[&'static str])] = &[
     ("create_account",  &["username", "displayname", "password", "email"]),
     ("login",           &["email", "password"]),
-    ("auth_test",       &["Authorization"]),
-    ("tweet",           &["Authorization", "content"]),
-    ("like",            &["Authorization", "tweet"]),
+    ("auth_test",       &["authorization"]),
+    ("tweet",           &["authorization", "content"]),
+    ("like",            &["authorization", "tweet"]),
+    ("comment",         &["authorization", "tweet", "content"]),
+    ("get_comments",    &["tweet"]),
 ];
 
 /*- Functions -*/
@@ -85,16 +87,11 @@ pub(super) fn create_account(
     
     /*- Require some headers to be specified -*/
     let required = utils::get_required_headers("create_account");
-    println!("required: {:?}", required);
-    println!("request: {}", request);
     let headers  = parse_headers(request, HeaderReturn::All);
-    println!("headers: {:?}", headers);
     if !expect_headers(&mut stream, &headers, required) { return; };
 
     /*- Initialize the user -*/
     let user:User;
-
-    println!("Hej");
 
     /*- Get the headers -*/
     if let HeaderReturn::Values(headers) = headers {
@@ -111,8 +108,6 @@ pub(super) fn create_account(
     }
     /*- If parsing headers was unsuccessful -*/
     else { return respond(&mut stream, 404, None, None); };
-    println!("{:?}", user);
-
 
     /*- If the email is invalid -*/
     if !check_email(&user.email) {
@@ -273,12 +268,12 @@ pub(crate) fn profile_data(
             match async_cursor.next() {
                 Some(user_data) => match user_data {
                     Ok(user_data) => user_data,
-                    Err(_) => return respond(&mut stream, 404, None, None)
+                    Err(e) => return respond(&mut stream, 404, None, None)
                 },
                 None => return respond(&mut stream, 404, None, None)
             }
         },
-        Err(_) => return respond(&mut stream, 404, None, None)
+        Err(e) => return respond(&mut stream, 404, None, None)
     });
 
     /*- Respond with the userdata -*/
@@ -402,10 +397,6 @@ pub(crate) fn tweet(
     /*- Require some headers to be specified -*/
     let required = utils::get_required_headers("tweet");
     let headers  = parse_headers(request.clone(), HeaderReturn::All);
-
-    println!("{:?}", required);
-    println!("{:?}", headers);
-
     if !expect_headers(&mut stream, &headers, required) { return; };
 
     /*- Check the auth availability -*/
@@ -464,10 +455,10 @@ pub(crate) fn tweet(
         Ok(_) => respond(&mut stream, 200u16, None, None),
 
         /*- Throw the docker-mongo bridge err -*/
-        Err(e) => respond(&mut stream, 500u16, Some((
+        Err(e) => {println!("{e}"); respond(&mut stream, 500u16, Some((
             ResponseType::Text,
             &get_error_code(103)
-        )), None)
+        )), None)}
     };
 }
 
@@ -480,10 +471,7 @@ pub(crate) fn like(
 
     /*- Require some headers to be specified -*/
     let required = utils::get_required_headers("like");
-    println!("{:?}", required);
-    println!("{:?}", request);
     let headers  = parse_headers(request.clone(), HeaderReturn::All);
-    println!("{:?}", headers);
     if !expect_headers(&mut stream, &headers, required) { return; };
 
     /*- Check the auth availability -*/
@@ -600,3 +588,132 @@ pub(crate) fn hashtag(
         None
     );
 }
+
+/*- Create a comment -*/
+pub(crate) fn comment(
+    mut stream : TcpStream,
+        request: String,
+        params : HashMap<String, String>
+) -> () {
+
+    /*- Require some headers to be specified -*/
+    let required = utils::get_required_headers("comment");
+    let headers  = parse_headers(request.clone(), HeaderReturn::All);
+    if !expect_headers(&mut stream, &headers, required) { return; };
+
+    /*- Check the auth availability -*/
+    let authentication_status:AuthorizationStatus = authenticate(headers.clone());
+    let user_claims:UserClaims = match authentication_status {
+        AuthorizationStatus::Authorized(v) => v,
+        AuthorizationStatus::Unauthorized => 
+            return respond(&mut stream, 401u16, Some((ResponseType::Text, DICTIONARY.error.unauthorized)), None),
+        AuthorizationStatus::Err =>
+            return respond(&mut stream, 401u16, Some((ResponseType::Text, DICTIONARY.error.unauthorized)), None)
+    };
+
+    /*- Get the headers -*/
+    let content:String;
+    let tweet_id:String;
+
+    /*- Get the headers -*/
+    if let HeaderReturn::Values(headers) = headers {
+        /*- Get the values -*/
+        content = headers.get("content").unwrap().to_string();
+        tweet_id= headers.get("tweet").unwrap().to_string();
+    }else {
+        /*- Return an error -*/
+        return respond(&mut stream, 400u16, None, None);
+    }
+
+    /*- Content will be a string of ascii numbers separated by commas (utf16) -*/
+    let content:String = String::from_utf16(
+        &content.split(",")
+        .map(|e| e.parse::<u16>()
+        .unwrap_or_default()
+    ).collect::<Vec<_>>())
+        .unwrap_or_default();
+
+    /*- Get the hashtags from the tweet -*/
+    let hashtags:Vec<String> = Regex::new(r"#\w+")
+        .unwrap()
+        .captures_iter(&content)
+        .map(|e| e.get(0).unwrap().as_str()[1..].to_string())
+        .collect::<Vec<_>>();
+
+    /*- Establish the mongodb connection -*/
+    let collection:Collection<Comment> = utils::establish_mclient::<Comment>("comments");
+
+    /*- Create the tweet -*/
+    let comment:Comment = Comment {
+        content,
+        owner: user_claims.suid,
+        id   : generate_suid(),
+        unix : utils::get_unix_epoch_time(),
+        tweet: tweet_id,
+        hashtags,
+        likes: vec![]
+    };
+
+    /*- Insert the tweet -*/
+    match collection.insert_one(comment, None) {
+        /*- Respond -*/
+        Ok(_) => respond(&mut stream, 200u16, None, None),
+
+        /*- Throw the docker-mongo bridge err -*/
+        Err(e) => {println!("{e}"); respond(&mut stream, 500u16, Some((
+            ResponseType::Text,
+            &get_error_code(103)
+        )), None)}
+    };
+}
+
+/*- Get all comments for a tweet -*/
+pub(crate) fn get_comments(
+    mut stream : TcpStream,
+        request: String,
+        params : HashMap<String, String>
+) -> () {
+
+    /*- Require some headers to be specified -*/
+    let required = utils::get_required_headers("get_comments");
+    let headers  = parse_headers(request.clone(), HeaderReturn::All);
+    if !expect_headers(&mut stream, &headers, required) { return; };
+
+    /*- Get the headers -*/
+    let tweet_id:String;
+
+    /*- Get the headers -*/
+    if let HeaderReturn::Values(headers) = headers {
+        /*- Get the values -*/
+        tweet_id= headers.get("tweet").unwrap().to_string();
+    }else {
+        /*- Return an error -*/
+        return respond(&mut stream, 400u16, None, None);
+    }
+
+    /*- Establish the mongodb connection -*/
+    let collection:Collection<Comment> = utils::establish_mclient::<Comment>("comments");
+    
+    /*- Get all -*/
+    let all_comments = match collection.find(doc!{ "tweet":tweet_id }, None) {
+        Ok(comments) => comments,
+        _ => return respond(&mut stream, 404u16, None, None),
+    }.into_iter()
+        .map(|e| e.unwrap_or_default())
+        .collect::<Vec<_>>();
+
+    /*- What we'll send back -*/
+    let response_json:&str = &serde_json::to_string(&all_comments).unwrap();
+
+    /*- Respond -*/
+    respond(
+        &mut stream,
+        200u16,
+        Some((
+            ResponseType::Json,
+            response_json
+        )),
+        None
+    )
+}
+
